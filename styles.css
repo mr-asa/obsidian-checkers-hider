@@ -1,14 +1,26 @@
 /* Hide completed tasks in preview/reading mode - only [x] and [X] */
 /* Note: Edit mode toggling is handled by CodeMirror extension, so no body class needed there */
 /* But preview mode needs the body class to respect the toggle */
-body.hide-completed-tasks .markdown-preview-view ul > li.task-list-item[data-task="x"],
-body.hide-completed-tasks .markdown-preview-view ul > li.task-list-item[data-task="X"] {
+body.hide-completed-tasks
+    .markdown-preview-view
+    ul
+    > li.task-list-item[data-task="x"],
+body.hide-completed-tasks
+    .markdown-preview-view
+    ul
+    > li.task-list-item[data-task="X"] {
     display: none;
 }
 
 /* Hide sub-bullets under completed tasks in preview/reading mode - only when hideSubBullets is enabled */
-body.hide-completed-tasks.hide-sub-bullets .markdown-preview-view li.task-list-item[data-task="x"] ul,
-body.hide-completed-tasks.hide-sub-bullets .markdown-preview-view li.task-list-item[data-task="X"] ul {
+body.hide-completed-tasks.hide-sub-bullets
+    .markdown-preview-view
+    li.task-list-item[data-task="x"]
+    ul,
+body.hide-completed-tasks.hide-sub-bullets
+    .markdown-preview-view
+    li.task-list-item[data-task="X"]
+    ul {
     display: none;
 }
 
@@ -17,7 +29,10 @@ body.hide-completed-tasks.hide-sub-bullets .markdown-preview-view li.task-list-i
 /* AND it only contains widget buffers and contenteditable=false spans (content was replaced) */
 /* This applies to both completed tasks and their uncompleted sub-tasks when hideSubBullets is on */
 .markdown-source-view.mod-cm6 .cm-content > div.cm-line[data-task]:not(:has(label)):has([contenteditable="false"]),
-.markdown-source-view .cm-content > div.cm-line[data-task]:not(:has(label)):has([contenteditable="false"]) {
+.markdown-source-view .cm-content > div.cm-line[data-task]:not(:has(label)):has([contenteditable="false"]),
+/* Also target HyperMD task lines in source mode */
+.markdown-source-view.mod-cm6 .cm-content > div.HyperMD-task-line:not(:has(label)):has([contenteditable="false"]),
+.markdown-source-view .cm-content > div.HyperMD-task-line:not(:has(label)):has([contenteditable="false"]) {
     display: none !important;
     height: 0 !important;
     min-height: 0 !important;
