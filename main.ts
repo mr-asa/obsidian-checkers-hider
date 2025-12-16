@@ -1,6 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting, addIcon, PluginManifest } from "obsidian";
 import { EditorView, Decoration, DecorationSet } from "@codemirror/view";
-import { StateField, StateEffect, Extension, Facet, RangeSetBuilder, EditorState } from "@codemirror/state";
+import { StateField, Extension, Facet, RangeSetBuilder, EditorState, Compartment } from "@codemirror/state";
+import { COMPLETED_TASK_REGEX, getIndentLevelFromText } from "./utils";
 
 interface TaskHiderSettings {
   hiddenState: boolean;
@@ -19,21 +20,6 @@ const taskHiderSettingsFacet = Facet.define<TaskHiderSettings, TaskHiderSettings
   combine: (values) => values[0] || DEFAULT_SETTINGS,
 });
 
-// Effect to trigger reconfiguration when settings change
-const reconfigureEffect = StateEffect.define<null>();
-
-/**
- * Get indentation level from line text (count leading spaces/tabs)
- */
-function getIndentLevelFromText(text: string): number {
-  const match = text.match(/^(\s*)/);
-  if (!match) return 0;
-
-  const whitespace = match[1];
-  // Count tabs as 4 spaces
-  return whitespace.replace(/\t/g, "    ").length;
-}
-
 /**
  * StateField that tracks which lines should be hidden
  * This uses replace decorations to properly remove content from the editor layout
@@ -43,8 +29,8 @@ const hideTasksField = StateField.define<DecorationSet>({
     return buildLineDecorations(state);
   },
   update(oldDecorations, tr): DecorationSet {
-    // Rebuild decorations if document changed or settings changed
-    if (tr.docChanged || tr.effects.some((e) => e.is(reconfigureEffect))) {
+    // Rebuild decorations if document changed or facet reconfigured
+    if (tr.docChanged || tr.reconfigured) {
       return buildLineDecorations(tr.state);
     }
     // Otherwise, map the existing decorations to account for changes
@@ -64,25 +50,20 @@ function buildLineDecorations(state: EditorState): DecorationSet {
     return Decoration.none;
   }
 
-  const builder = new RangeSetBuilder<Decoration>();
   const doc = state.doc;
 
-  // Identify completed task lines and their sub-bullets
+  // First pass: identify which lines should be hidden
+  const linesToHide = new Set<number>();
+
   for (let lineNum = 1; lineNum <= doc.lines; lineNum++) {
     const line = doc.line(lineNum);
     const lineText = line.text;
 
     // Check if this is a completed task line
-    const isCompletedTask = /^(\s*[-*+])\s+\[(x|X)\]/.test(lineText);
+    const isCompletedTask = COMPLETED_TASK_REGEX.test(lineText);
 
     if (isCompletedTask) {
-      // Use a replace decoration to hide the entire line
-      // This properly removes it from the layout so the gutter aligns correctly
-      builder.add(
-        line.from,
-        line.to,
-        Decoration.replace({})
-      );
+      linesToHide.add(lineNum);
 
       // If hideSubBullets is enabled, mark nested items
       if (settings.hideSubBullets) {
@@ -93,9 +74,9 @@ function buildLineDecorations(state: EditorState): DecorationSet {
           const subLine = doc.line(subLineNum);
           const subLineText = subLine.text;
 
-          // Skip empty lines
+          // Empty line breaks the nesting - content after is independent
           if (subLineText.trim() === "") {
-            continue;
+            break;
           }
 
           const subIndent = getIndentLevelFromText(subLineText);
@@ -105,15 +86,35 @@ function buildLineDecorations(state: EditorState): DecorationSet {
             break;
           }
 
-          // Hide the sub-bullet line
-          builder.add(
-            subLine.from,
-            subLine.to,
-            Decoration.replace({})
-          );
+          // Mark this sub-bullet line for hiding
+          linesToHide.add(subLineNum);
         }
       }
     }
+  }
+
+  // Second pass: build decorations in order, merging consecutive hidden lines
+  const builder = new RangeSetBuilder<Decoration>();
+
+  for (let lineNum = 1; lineNum <= doc.lines; lineNum++) {
+    if (!linesToHide.has(lineNum)) {
+      continue;
+    }
+
+    const line = doc.line(lineNum);
+
+    // Check if next line is also hidden - if so, include newline to avoid gaps
+    const nextLineAlsoHidden = linesToHide.has(lineNum + 1);
+    const isLastLine = lineNum === doc.lines;
+
+    // Include newline only if next line is also hidden (creates contiguous hidden block)
+    const endPos = (nextLineAlsoHidden && !isLastLine) ? line.to + 1 : line.to;
+
+    builder.add(
+      line.from,
+      endPos,
+      Decoration.replace({})
+    );
   }
 
   return builder.finish();
@@ -122,6 +123,7 @@ function buildLineDecorations(state: EditorState): DecorationSet {
 export default class TaskHiderPlugin extends Plugin {
   statusBar: HTMLElement | null = null;
   settings: TaskHiderSettings;
+  private settingsCompartment = new Compartment();
 
   constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
@@ -167,7 +169,7 @@ export default class TaskHiderPlugin extends Plugin {
    */
   createEditorExtension(): Extension {
     return [
-      taskHiderSettingsFacet.of(this.settings),
+      this.settingsCompartment.of(taskHiderSettingsFacet.of(this.settings)),
       hideTasksField,
     ];
   }
@@ -176,17 +178,19 @@ export default class TaskHiderPlugin extends Plugin {
    * Update all editor instances to use the new settings
    */
   updateEditorExtensions() {
-    // Get all markdown views and dispatch reconfigure effect
+    // Get all markdown views and dispatch compartment reconfigure
     this.app.workspace.iterateAllLeaves((leaf) => {
       if (leaf.view.getViewType() === "markdown") {
         const view = (leaf.view as any).editor;
         if (view && view.cm) {
           const cm = view.cm as EditorView;
 
-          // Just dispatch our custom effect to trigger a rebuild of decorations
-          // Don't use StateEffect.reconfigure as it would remove Obsidian's extensions
+          // Use compartment reconfiguration to update settings
+          // This properly updates the facet value without removing Obsidian's extensions
           cm.dispatch({
-            effects: [reconfigureEffect.of(null)],
+            effects: this.settingsCompartment.reconfigure(
+              taskHiderSettingsFacet.of(this.settings)
+            ),
           });
         }
       }
