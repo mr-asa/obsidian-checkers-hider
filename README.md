@@ -1,128 +1,78 @@
-# Obsidian Checkers Hider
+# Checkers Hider
 
-Obsidian Checkers Hider is an Obsidian plugin for hiding completed or custom-status checklist items while keeping the note content intact.
+Hide completed and custom-status checklist items in Obsidian without changing your notes.
 
-It started as a standalone continuation of the original Completed Task Display plugin, with support for custom checkbox markers, inverted matching, per-page overrides, and better Live Preview hiding through CodeMirror decorations.
+Checkers Hider can hide regular completed tasks like `[x]`, custom checkbox markers like `[-]` or `[/]`, and matching tasks rendered by Reading view, Live Preview, Kanban, Canvas, Dataview task lists, and hover previews.
 
 ## Features
 
-- Toggle matching checklist items from the ribbon, command palette, or clickable status bar.
-- Hide standard completed tasks like `[x]` and `[X]`.
-- Configure custom checkbox markers such as `[-]`, `[/]`, `[?]`, or `[!]`.
-- Choose whether the marker list means "hide these" or "keep these visible".
-- Optionally hide indented sub-bullets and nested tasks under a hidden parent task in Source and Live Preview.
-- Disable hiding for individual pages with inline or frontmatter tags.
-- Works in Reading view and Live Preview/Source mode.
+- Hide or show matching checklist items with a command, status bar icon, or optional ribbon button.
+- Hide completed tasks by default: `[x]` and `[X]`.
+- Configure custom task markers such as `-`, `/`, `?`, or `!`.
+- Choose whether the marker list means "hide these markers" or "keep these markers visible".
+- Optionally hide nested bullets under a hidden task.
+- Optionally show all checkboxes while editing, while still hiding them in preview.
+- Disable hiding on specific pages with an inline or frontmatter tag.
 
-## Installation
-
-### Manual Install
+## Install
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from a release.
-2. Put the files in `<vault>/.obsidian/plugins/obsidian-checkers-hider/`.
-3. Reload Obsidian.
-4. Enable `Obsidian Checkers Hider` in Settings -> Community plugins.
-
-### Development Install
-
-```bash
-npm install
-npm run build
-```
-
-Then copy or symlink this repository into:
+2. Create this folder in your vault:
 
 ```text
 <vault>/.obsidian/plugins/obsidian-checkers-hider/
 ```
 
+3. Put the three files into that folder.
+4. Reload Obsidian.
+5. Enable `Checkers Hider` in Settings -> Community plugins.
+
 ## Usage
 
-Use the ribbon icon, the `Toggle Checkers Hider` command, or the status bar control to switch hiding on and off globally.
+Use `Toggle Checkers Hider` from the command palette, the status bar checkbox icon, or the optional ribbon button.
 
-The global toggle is saved between sessions.
+The status bar icon is dark green when hiding is enabled and gray when it is disabled.
 
 ## Settings
 
-### Task Marker Mode
+`Task marker mode`
 
-`Hide listed markers` hides only tasks whose checkbox marker is listed in `Task markers`.
+- `Hide listed markers`: hides only markers listed in `Task markers`.
+- `Keep listed markers`: keeps `[ ]` and listed markers visible, then hides other non-empty task statuses.
 
-Default:
+`Task markers`
 
-```text
-x, X
-```
-
-This hides:
-
-```markdown
-- [x] done
-- [X] done
-```
-
-`Keep listed markers` is the inverted behavior. It keeps `[ ]` and the listed custom markers visible, then hides other non-empty task statuses.
-
-For example, with markers:
-
-```text
-?, /
-```
-
-These stay visible:
-
-```markdown
-- [ ] open
-- [?] question
-- [/] in progress
-```
-
-Other non-empty statuses, including `[x]`, are hidden.
-
-### Task Markers
-
-Enter markers separated by commas or spaces:
+Markers are entered without brackets, separated by commas or spaces:
 
 ```text
 x, X, -, /
 ```
 
-Do not include the brackets. Use `/`, not `[/]`.
+`Hide sub-bullets`
 
-### Hide Sub-Bullets
+Also hides indented bullets and nested tasks under a hidden task.
 
-When enabled, Source mode and Live Preview also hide indented lines below a hidden task until the next blank line or same-level line.
+`Show all checkboxes in edit mode`
 
-Example:
+Keeps Source mode, Live Preview, and popover editing fully visible while preview modes still hide matching tasks.
 
-```markdown
-- [x] done
-  - nested bullet
-  - [ ] nested unchecked task
-- [ ] independent task
-```
+`Page override tags`
 
-With `Hide sub-bullets` on, the first three lines are hidden. With it off, only the completed parent task is hidden.
+Show matching tasks on specific pages even when hiding is globally enabled.
 
-In Reading view, nested content is part of the rendered list item, so it follows the hidden parent task.
-
-### Page Override Tags
-
-Use `Page override tags` to show completed or matching tasks on specific pages even when global hiding is enabled.
-
-Defaults:
+Default tags:
 
 ```text
 checkers-show-completed, ctd-show-completed
 ```
 
-Inline tag:
+You can use an inline tag:
 
 ```markdown
 #checkers-show-completed
 ```
 
-Frontmatter:
+Or frontmatter:
 
 ```yaml
 ---
@@ -130,22 +80,6 @@ tags:
   - checkers-show-completed
 ---
 ```
-
-The override is evaluated per markdown view, so different tabs can show different behavior at the same time.
-
-## Development
-
-```bash
-npm install
-npm test
-npm run build
-```
-
-Release files are:
-
-- `main.js`
-- `manifest.json`
-- `styles.css`
 
 ## Credits
 

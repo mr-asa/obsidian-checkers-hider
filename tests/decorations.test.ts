@@ -45,6 +45,7 @@ describe("task marker hiding modes", () => {
     expect(shouldHideTaskMarker("-", settings)).toBe(true);
     expect(shouldHideTaskMarker("/", settings)).toBe(false);
     expect(shouldHideTaskMarker(" ", settings)).toBe(false);
+    expect(shouldHideTaskMarker("", settings)).toBe(false);
   });
 
   it("keeps listed markers and hides other non-empty statuses in keep-listed mode", () => {
@@ -55,6 +56,7 @@ describe("task marker hiding modes", () => {
     expect(shouldHideTaskMarker("x", settings)).toBe(true);
     expect(shouldHideTaskMarker("-", settings)).toBe(true);
     expect(shouldHideTaskMarker(" ", settings)).toBe(false);
+    expect(shouldHideTaskMarker("", settings)).toBe(false);
   });
 });
 
@@ -79,6 +81,7 @@ describe("nested line hiding", () => {
     expect(getHiddenLineNumbers(lines, {
       hiddenState: true,
       hideSubBullets: false,
+      showInEditMode: false,
       mode: "hide-listed",
       taskMarkers: ["x", "X"],
     })).toEqual(new Set([1]));
@@ -96,6 +99,7 @@ describe("nested line hiding", () => {
     expect(getHiddenLineNumbers(lines, {
       hiddenState: true,
       hideSubBullets: true,
+      showInEditMode: false,
       mode: "hide-listed",
       taskMarkers: ["x", "X"],
     })).toEqual(new Set([1, 2, 3, 4]));
@@ -112,6 +116,7 @@ describe("nested line hiding", () => {
     expect(getHiddenLineNumbers(lines, {
       hiddenState: true,
       hideSubBullets: true,
+      showInEditMode: false,
       mode: "hide-listed",
       taskMarkers: ["x", "X"],
     })).toEqual(new Set([1, 2]));
@@ -128,9 +133,17 @@ describe("nested line hiding", () => {
     expect(getHiddenLineNumbers(lines, {
       hiddenState: true,
       hideSubBullets: true,
+      showInEditMode: false,
       mode: "hide-listed",
       taskMarkers: ["-"],
     })).toEqual(new Set([1, 2]));
+  });
+
+  it("does not hide unchecked parent tasks when Obsidian exposes an empty data-task marker", () => {
+    expect(shouldHideTaskMarker("", {
+      mode: "keep-listed",
+      taskMarkers: ["x", "X"],
+    })).toBe(false);
   });
 });
 

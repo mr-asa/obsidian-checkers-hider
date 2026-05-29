@@ -1,26 +1,31 @@
 /*
  * Reading view hiding is generated dynamically by main.ts and scoped per
- * Markdown view. Do not add global body-based task hiding here; page override
- * tags rely on each pane being able to opt out independently.
+ * Markdown view. Edit mode hiding is handled by CodeMirror block replace
+ * decorations. Do not add heuristic task-line hiding selectors here; Obsidian's
+ * rendered editor DOM can make visible parent checkboxes look like decoration
+ * placeholders.
  */
 
-/* Hide task lines that have been replaced by CodeMirror decorations. */
-.markdown-source-view.mod-cm6 .cm-content > div.cm-line[data-task]:not(:has(label)):has([contenteditable="false"]),
-.markdown-source-view .cm-content > div.cm-line[data-task]:not(:has(label)):has([contenteditable="false"]),
-.markdown-source-view.mod-cm6 .cm-content > div.HyperMD-task-line:not(:has(label)):has([contenteditable="false"]),
-.markdown-source-view .cm-content > div.HyperMD-task-line:not(:has(label)):has([contenteditable="false"]) {
-    display: none !important;
-    height: 0 !important;
-    min-height: 0 !important;
-    max-height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    line-height: 0 !important;
-    overflow: hidden !important;
-    visibility: hidden !important;
+.checkers-hider-status {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-muted);
 }
 
-/* Hide gutter line numbers for hidden lines. */
+.checkers-hider-status svg {
+    width: 16px;
+    height: 16px;
+}
+
+.checkers-hider-status-enabled {
+    color: #146c2e;
+}
+
+.checkers-hider-status-disabled {
+    color: var(--text-muted);
+}
+
+/* Hide gutter line numbers for lines collapsed by block decorations. */
 .cm-lineNumbers .cm-gutterElement[style*="height: 0px"] {
     display: none !important;
     visibility: hidden !important;

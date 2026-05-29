@@ -14,6 +14,7 @@ export interface TaskMarkerSettings {
 export interface HiddenLineSettings extends TaskMarkerSettings {
   hiddenState: boolean;
   hideSubBullets: boolean;
+  showInEditMode: boolean;
 }
 
 export interface TagCacheLike {
@@ -70,7 +71,7 @@ export function shouldHideTaskMarker(
   marker: string | null,
   settings: TaskMarkerSettings,
 ): boolean {
-  if (marker === null || marker === " ") {
+  if (marker === null || marker.trim() === "") {
     return false;
   }
 

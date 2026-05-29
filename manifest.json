@@ -1,6 +1,6 @@
 {
 	"id": "obsidian-checkers-hider",
-	"name": "Obsidian Checkers Hider",
+	"name": "Checkers Hider",
 	"version": "1.0.0",
 	"minAppVersion": "0.10.0",
 	"description": "Hide or show completed and custom-status checklist items in Obsidian.",
