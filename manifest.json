@@ -1,9 +1,9 @@
 {
 	"id": "checkers-hider",
 	"name": "Checkers Hider",
-	"version": "1.5.1",
+	"version": "1.5.2",
 	"minAppVersion": "0.10.0",
-	"description": "Hide or show completed and custom-status checklist items in Obsidian.",
+	"description": "Hide or show completed and custom-status checklist items.",
 	"author": "mr-asa",
 	"authorUrl": "https://github.com/mr-asa",
 	"isDesktopOnly": false

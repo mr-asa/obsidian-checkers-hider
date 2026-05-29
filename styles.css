@@ -27,9 +27,9 @@
 
 /* Hide gutter line numbers for lines collapsed by block decorations. */
 .cm-lineNumbers .cm-gutterElement[style*="height: 0px"] {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    display: none;
+    visibility: hidden;
+    height: 0;
+    margin: 0;
+    padding: 0;
 }
