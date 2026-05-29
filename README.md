@@ -29,7 +29,7 @@ Checkers Hider can hide regular completed tasks like `[x]` and custom checkbox m
 2. Create this folder in your vault:
 
 ```text
-<vault>/.obsidian/plugins/obsidian-checkers-hider/
+<vault>/.obsidian/plugins/checkers-hider/
 ```
 
 3. Put the three files into that folder.

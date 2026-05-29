@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_ID: obsidian-checkers-hider
+  PLUGIN_ID: checkers-hider
 
 jobs:
   release:
