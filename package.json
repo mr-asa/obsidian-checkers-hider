@@ -1,7 +1,7 @@
 {
-  "name": "completed-task-display",
-  "version": "1.0.11",
-  "description": "Provides a button in the ribbon to hide or display completed tasks",
+  "name": "obsidian-checkers-hider",
+  "version": "1.0.0",
+  "description": "Hide or show completed and custom-status checklist items in Obsidian.",
   "main": "main.js",
   "type": "module",
   "scripts": {
@@ -14,9 +14,10 @@
     "obsidian",
     "obsidian-plugin",
     "tasks",
-    "completed-tasks"
+    "completed-tasks",
+    "custom-checkboxes"
   ],
-  "author": "Ben Lee-Cohen",
+  "author": "mr-asa",
   "license": "MIT",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.8",

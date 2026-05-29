@@ -1,10 +1,10 @@
 {
-	"id": "completed-task-display",
-	"name": "Completed Task Display",
-	"version": "1.0.11",
+	"id": "obsidian-checkers-hider",
+	"name": "Obsidian Checkers Hider",
+	"version": "1.0.0",
 	"minAppVersion": "0.10.0",
-	"description": "Provides a button in the ribbon to hide or display completed tasks",
-	"author": "Ben Lee-Cohen",
-	"authorUrl": "https://github.com/heliostatic/completed-task-display",
+	"description": "Hide or show completed and custom-status checklist items in Obsidian.",
+	"author": "mr-asa",
+	"authorUrl": "https://github.com/mr-asa",
 	"isDesktopOnly": false
 }

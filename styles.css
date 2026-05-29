@@ -1,36 +1,12 @@
-/* Hide completed tasks in preview/reading mode - only [x] and [X] */
-/* Note: Edit mode toggling is handled by CodeMirror extension, so no body class needed there */
-/* But preview mode needs the body class to respect the toggle */
-body.hide-completed-tasks
-    .markdown-preview-view
-    ul
-    > li.task-list-item[data-task="x"],
-body.hide-completed-tasks
-    .markdown-preview-view
-    ul
-    > li.task-list-item[data-task="X"] {
-    display: none;
-}
+/*
+ * Reading view hiding is generated dynamically by main.ts and scoped per
+ * Markdown view. Do not add global body-based task hiding here; page override
+ * tags rely on each pane being able to opt out independently.
+ */
 
-/* Hide sub-bullets under completed tasks in preview/reading mode - only when hideSubBullets is enabled */
-body.hide-completed-tasks.hide-sub-bullets
-    .markdown-preview-view
-    li.task-list-item[data-task="x"]
-    ul,
-body.hide-completed-tasks.hide-sub-bullets
-    .markdown-preview-view
-    li.task-list-item[data-task="X"]
-    ul {
-    display: none;
-}
-
-/* Hide task lines that have been replaced by our decorations */
-/* When a replace decoration is active, the line has data-task but NO label (checkbox was removed) */
-/* AND it only contains widget buffers and contenteditable=false spans (content was replaced) */
-/* This applies to both completed tasks and their uncompleted sub-tasks when hideSubBullets is on */
+/* Hide task lines that have been replaced by CodeMirror decorations. */
 .markdown-source-view.mod-cm6 .cm-content > div.cm-line[data-task]:not(:has(label)):has([contenteditable="false"]),
 .markdown-source-view .cm-content > div.cm-line[data-task]:not(:has(label)):has([contenteditable="false"]),
-/* Also target HyperMD task lines in source mode */
 .markdown-source-view.mod-cm6 .cm-content > div.HyperMD-task-line:not(:has(label)):has([contenteditable="false"]),
 .markdown-source-view .cm-content > div.HyperMD-task-line:not(:has(label)):has([contenteditable="false"]) {
     display: none !important;
@@ -44,12 +20,7 @@ body.hide-completed-tasks.hide-sub-bullets
     visibility: hidden !important;
 }
 
-/* Note: Sub-bullets in edit mode are hidden by CodeMirror replace decorations (see main.ts),
-   not by CSS. The JavaScript applies replace decorations only to sub-bullets beneath completed tasks.
-   We don't need CSS rules here because the decorations handle it properly. */
-
-/* Hide gutter line numbers for hidden lines (those with height: 0) */
-/* When replace decorations hide content, the gutter elements get height: 0 but are still rendered */
+/* Hide gutter line numbers for hidden lines. */
 .cm-lineNumbers .cm-gutterElement[style*="height: 0px"] {
     display: none !important;
     visibility: hidden !important;

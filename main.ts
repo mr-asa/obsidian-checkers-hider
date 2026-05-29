@@ -1,48 +1,63 @@
-import { App, Plugin, PluginSettingTab, Setting, addIcon, PluginManifest } from "obsidian";
-import { EditorView, Decoration, DecorationSet } from "@codemirror/view";
-import { StateField, Extension, Facet, RangeSetBuilder, EditorState, Compartment } from "@codemirror/state";
-import { COMPLETED_TASK_REGEX, getIndentLevelFromText } from "./utils";
+import {
+  App,
+  CachedMetadata,
+  MarkdownView,
+  Plugin,
+  PluginManifest,
+  PluginSettingTab,
+  Setting,
+  TFile,
+  addIcon,
+  setIcon,
+} from "obsidian";
+import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
+import { Compartment, EditorState, Extension, Facet, RangeSetBuilder, StateField } from "@codemirror/state";
+import {
+  DEFAULT_TASK_MARKERS,
+  HiddenLineSettings,
+  TaskMarkerMode,
+  getHiddenLineNumbers,
+  normalizeTaskMarkers,
+  parseListSetting,
+  shouldDisableHidingForMetadata,
+} from "./utils";
 
-interface TaskHiderSettings {
-  hiddenState: boolean;
+interface TaskHiderSettings extends HiddenLineSettings {
   showStatusBar: boolean;
-  hideSubBullets: boolean;
+  disableHidingTags: string[];
 }
 
 const DEFAULT_SETTINGS: TaskHiderSettings = {
   hiddenState: true,
   showStatusBar: true,
   hideSubBullets: false,
+  mode: "hide-listed",
+  taskMarkers: DEFAULT_TASK_MARKERS,
+  disableHidingTags: ["checkers-show-completed", "ctd-show-completed"],
 };
 
-// Facet for providing settings to the CodeMirror extension
+const ENABLED_VIEW_CLASS = "checkers-hider-enabled";
+const DISABLED_VIEW_CLASS = "checkers-hider-disabled";
+const STYLE_ID = "checkers-hider-dynamic-css";
+
 const taskHiderSettingsFacet = Facet.define<TaskHiderSettings, TaskHiderSettings>({
   combine: (values) => values[0] || DEFAULT_SETTINGS,
 });
 
-/**
- * StateField that tracks which lines should be hidden
- * This uses replace decorations to properly remove content from the editor layout
- */
 const hideTasksField = StateField.define<DecorationSet>({
-  create(state): DecorationSet {
+  create(state: EditorState): DecorationSet {
     return buildLineDecorations(state);
   },
-  update(oldDecorations, tr): DecorationSet {
-    // Rebuild decorations if document changed or facet reconfigured
+  update(oldDecorations: DecorationSet, tr): DecorationSet {
     if (tr.docChanged || tr.reconfigured) {
       return buildLineDecorations(tr.state);
     }
-    // Otherwise, map the existing decorations to account for changes
+
     return oldDecorations.map(tr.changes);
   },
   provide: (field) => EditorView.decorations.from(field),
 });
 
-/**
- * Build replace decorations that actually hide the content
- * This properly removes lines from the editor layout, fixing gutter alignment
- */
 function buildLineDecorations(state: EditorState): DecorationSet {
   const settings = state.facet(taskHiderSettingsFacet);
 
@@ -51,49 +66,13 @@ function buildLineDecorations(state: EditorState): DecorationSet {
   }
 
   const doc = state.doc;
-
-  // First pass: identify which lines should be hidden
-  const linesToHide = new Set<number>();
+  const lines: string[] = [];
 
   for (let lineNum = 1; lineNum <= doc.lines; lineNum++) {
-    const line = doc.line(lineNum);
-    const lineText = line.text;
-
-    // Check if this is a completed task line
-    const isCompletedTask = COMPLETED_TASK_REGEX.test(lineText);
-
-    if (isCompletedTask) {
-      linesToHide.add(lineNum);
-
-      // If hideSubBullets is enabled, mark nested items
-      if (settings.hideSubBullets) {
-        const taskIndent = getIndentLevelFromText(lineText);
-
-        // Look at subsequent lines to find sub-bullets
-        for (let subLineNum = lineNum + 1; subLineNum <= doc.lines; subLineNum++) {
-          const subLine = doc.line(subLineNum);
-          const subLineText = subLine.text;
-
-          // Empty line breaks the nesting - content after is independent
-          if (subLineText.trim() === "") {
-            break;
-          }
-
-          const subIndent = getIndentLevelFromText(subLineText);
-
-          // If we hit a line with equal or less indentation, stop
-          if (subIndent <= taskIndent) {
-            break;
-          }
-
-          // Mark this sub-bullet line for hiding
-          linesToHide.add(subLineNum);
-        }
-      }
-    }
+    lines.push(doc.line(lineNum).text);
   }
 
-  // Second pass: build decorations in order, merging consecutive hidden lines
+  const linesToHide = getHiddenLineNumbers(lines, settings);
   const builder = new RangeSetBuilder<Decoration>();
 
   for (let lineNum = 1; lineNum <= doc.lines; lineNum++) {
@@ -102,71 +81,145 @@ function buildLineDecorations(state: EditorState): DecorationSet {
     }
 
     const line = doc.line(lineNum);
-
-    // Check if next line is also hidden - if so, include newline to avoid gaps
     const nextLineAlsoHidden = linesToHide.has(lineNum + 1);
     const isLastLine = lineNum === doc.lines;
+    const endPos = nextLineAlsoHidden && !isLastLine ? line.to + 1 : line.to;
 
-    // Include newline only if next line is also hidden (creates contiguous hidden block)
-    const endPos = (nextLineAlsoHidden && !isLastLine) ? line.to + 1 : line.to;
-
-    builder.add(
-      line.from,
-      endPos,
-      Decoration.replace({})
-    );
+    builder.add(line.from, endPos, Decoration.replace({}));
   }
 
   return builder.finish();
+}
+
+function cssString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function taskSelector(marker: string): string {
+  return `[data-task=${cssString(marker)}]`;
+}
+
+function buildTaskSelectors(settings: TaskHiderSettings): string[] {
+  const markers = normalizeTaskMarkers(settings.taskMarkers);
+
+  if (settings.mode === "keep-listed") {
+    const keepSelectors = [taskSelector(" "), ...markers.map(taskSelector)];
+    return [`li.task-list-item[data-task]${keepSelectors.map((selector) => `:not(${selector})`).join("")}`];
+  }
+
+  return markers.map((marker) => `li.task-list-item${taskSelector(marker)}`);
+}
+
+function buildDynamicCss(settings: TaskHiderSettings): string {
+  const readingSelectors: string[] = [];
+
+  for (const selector of buildTaskSelectors(settings)) {
+    readingSelectors.push(
+      `.${ENABLED_VIEW_CLASS}.markdown-preview-view ul > ${selector}`,
+      `.${ENABLED_VIEW_CLASS} .markdown-preview-view ul > ${selector}`,
+      `.${ENABLED_VIEW_CLASS}.markdown-reading-view ul > ${selector}`,
+      `.${ENABLED_VIEW_CLASS} .markdown-reading-view ul > ${selector}`,
+    );
+  }
+
+  return `${readingSelectors.join(",\n")} {\n  display: none;\n}`;
+}
+
+function normalizeSettings(data: Partial<TaskHiderSettings> & {
+  incompleteSymbols?: string[];
+  invertRule?: boolean;
+  hideMarkers?: string[];
+} | null | undefined): TaskHiderSettings {
+  const migratedMarkers = Array.isArray(data?.hideMarkers)
+    ? data?.hideMarkers
+    : Array.isArray(data?.incompleteSymbols)
+      ? data?.incompleteSymbols
+      : data?.taskMarkers;
+
+  const migratedMode: TaskMarkerMode =
+    data?.mode === "keep-listed" || data?.mode === "hide-listed"
+      ? data.mode
+      : Array.isArray(data?.incompleteSymbols) && data?.invertRule !== true
+        ? "keep-listed"
+        : DEFAULT_SETTINGS.mode;
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...data,
+    hiddenState: typeof data?.hiddenState === "boolean" ? data.hiddenState : DEFAULT_SETTINGS.hiddenState,
+    showStatusBar: typeof data?.showStatusBar === "boolean" ? data.showStatusBar : DEFAULT_SETTINGS.showStatusBar,
+    hideSubBullets: typeof data?.hideSubBullets === "boolean" ? data.hideSubBullets : DEFAULT_SETTINGS.hideSubBullets,
+    mode: migratedMode,
+    taskMarkers: normalizeTaskMarkers(Array.isArray(migratedMarkers) ? migratedMarkers : DEFAULT_SETTINGS.taskMarkers),
+    disableHidingTags: Array.isArray(data?.disableHidingTags)
+      ? data.disableHidingTags.map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean)
+      : DEFAULT_SETTINGS.disableHidingTags,
+  };
 }
 
 export default class TaskHiderPlugin extends Plugin {
   statusBar: HTMLElement | null = null;
   settings: TaskHiderSettings;
   private settingsCompartment = new Compartment();
+  private styleEl: HTMLStyleElement | null = null;
 
   constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
-    // Status bar will be created in onload to ensure proper initialization on mobile
   }
 
   async toggleCompletedTaskView() {
     this.settings.hiddenState = !this.settings.hiddenState;
-
-    // Toggle body class for preview mode CSS
-    document.body.toggleClass("hide-completed-tasks", this.settings.hiddenState);
-
-    if (this.statusBar && this.settings.showStatusBar) {
-      this.statusBar.setText(
-        this.settings.hiddenState ? "Hiding Completed Tasks" : "Showing Completed Tasks",
-      );
-    }
-
-    // Update all editor instances with new settings
-    this.updateEditorExtensions();
-
+    this.applySettingsToWorkspace();
     await this.saveSettings();
   }
 
-  /**
-   * Update body classes to reflect current settings
-   */
   updateBodyClasses() {
     document.body.toggleClass("hide-completed-tasks", this.settings.hiddenState);
     document.body.toggleClass("hide-sub-bullets", this.settings.hideSubBullets);
   }
 
+  updateStatusBar() {
+    if (!this.statusBar || !this.settings.showStatusBar) {
+      return;
+    }
+
+    this.statusBar.setText(
+      this.settings.hiddenState ? "Hiding Checkers" : "Showing Checkers",
+    );
+    this.statusBar.setAttribute("aria-label", "Toggle completed task hiding");
+  }
+
+  ensureStatusBar() {
+    if (!this.settings.showStatusBar || this.statusBar) {
+      return;
+    }
+
+    this.statusBar = this.addStatusBarItem();
+    setIcon(this.statusBar, "list-checks");
+    this.statusBar.addClass("mod-clickable");
+    this.statusBar.addEventListener("click", () => {
+      this.toggleCompletedTaskView();
+    });
+    this.updateStatusBar();
+  }
+
+  removeStatusBar() {
+    if (!this.statusBar) {
+      return;
+    }
+
+    this.statusBar.remove();
+    this.statusBar = null;
+  }
+
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = normalizeSettings(await this.loadData());
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
   }
 
-  /**
-   * Create the CodeMirror extension with current settings
-   */
   createEditorExtension(): Extension {
     return [
       this.settingsCompartment.of(taskHiderSettingsFacet.of(this.settings)),
@@ -174,86 +227,111 @@ export default class TaskHiderPlugin extends Plugin {
     ];
   }
 
-  /**
-   * Update all editor instances to use the new settings
-   */
-  updateEditorExtensions() {
-    // Get all markdown views and dispatch compartment reconfigure
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      if (leaf.view.getViewType() === "markdown") {
-        const view = (leaf.view as any).editor;
-        if (view && view.cm) {
-          const cm = view.cm as EditorView;
+  getEffectiveSettingsForFile(file: TFile | null | undefined): TaskHiderSettings {
+    const metadata = file
+      ? this.app.metadataCache.getFileCache(file) as CachedMetadata | null
+      : null;
+    const disableForPage = shouldDisableHidingForMetadata(
+      metadata,
+      this.settings.disableHidingTags,
+    );
 
-          // Use compartment reconfiguration to update settings
-          // This properly updates the facet value without removing Obsidian's extensions
-          cm.dispatch({
-            effects: this.settingsCompartment.reconfigure(
-              taskHiderSettingsFacet.of(this.settings)
-            ),
-          });
-        }
+    return {
+      ...this.settings,
+      hiddenState: this.settings.hiddenState && !disableForPage,
+    };
+  }
+
+  updateMarkdownView(view: MarkdownView) {
+    const effectiveSettings = this.getEffectiveSettingsForFile(view.file);
+    const containerEl = view.containerEl;
+
+    containerEl.toggleClass(ENABLED_VIEW_CLASS, effectiveSettings.hiddenState);
+    containerEl.toggleClass(DISABLED_VIEW_CLASS, !effectiveSettings.hiddenState);
+
+    const editor = (view as any).editor;
+    if (editor?.cm) {
+      const cm = editor.cm as EditorView;
+      cm.dispatch({
+        effects: this.settingsCompartment.reconfigure(
+          taskHiderSettingsFacet.of(effectiveSettings),
+        ),
+      });
+    }
+  }
+
+  updateEditorExtensions() {
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (leaf.view.getViewType() !== "markdown") {
+        return;
       }
+
+      this.updateMarkdownView(leaf.view as MarkdownView);
     });
+  }
+
+  updateDynamicCss() {
+    if (!this.styleEl) {
+      this.styleEl = document.createElement("style");
+      this.styleEl.id = STYLE_ID;
+      document.head.appendChild(this.styleEl);
+    }
+
+    this.styleEl.textContent = buildDynamicCss(this.settings);
+  }
+
+  applySettingsToWorkspace() {
+    this.updateBodyClasses();
+    this.updateStatusBar();
+    this.updateDynamicCss();
+    this.updateEditorExtensions();
   }
 
   async onload() {
     try {
-      // Load settings first
       await this.loadSettings();
 
-      // Create status bar item if enabled
       if (this.settings.showStatusBar) {
-        this.statusBar = this.addStatusBarItem();
+        this.ensureStatusBar();
       }
 
-      // Register command (available immediately)
       this.addCommand({
         id: "toggle-completed-task-view",
-        name: "Toggle Completed Task View",
+        name: "Toggle Checkers Hider",
         callback: () => {
           this.toggleCompletedTaskView();
         },
       });
 
-      // Add settings tab
       this.addSettingTab(new TaskHiderSettingTab(this.app, this));
-
-      // Register CodeMirror extension for hiding tasks
       this.registerEditorExtension(this.createEditorExtension());
 
-      // Wait for workspace to be ready before manipulating DOM and UI
-      // This is especially important on mobile platforms like iOS
+      this.registerEvent(this.app.workspace.on("file-open", () => this.applySettingsToWorkspace()));
+      this.registerEvent(this.app.workspace.on("layout-change", () => this.applySettingsToWorkspace()));
+      this.registerEvent(this.app.metadataCache.on("changed", () => this.applySettingsToWorkspace()));
+
       this.app.workspace.onLayoutReady(() => {
         try {
-          // Set initial body classes for preview mode
-          this.updateBodyClasses();
-
-          // Update status bar if enabled
-          if (this.statusBar && this.settings.showStatusBar) {
-            this.statusBar.setText(
-              this.settings.hiddenState ? "Hiding Completed Tasks" : "Showing Completed Tasks",
-            );
-          }
-
-          // Register icon and ribbon button
+          this.applySettingsToWorkspace();
           addIcon("tasks", taskShowIcon);
-          this.addRibbonIcon("tasks", "Task Hider", () => {
+          this.addRibbonIcon("tasks", "Checkers Hider", () => {
             this.toggleCompletedTaskView();
           });
         } catch (error) {
-          console.error("Failed to initialize Completed Task Display UI:", error);
+          console.error("Failed to initialize Obsidian Checkers Hider UI:", error);
         }
       });
     } catch (error) {
-      console.error("Failed to load Completed Task Display plugin:", error);
-      // Ensure default settings even if loading fails
+      console.error("Failed to load Obsidian Checkers Hider plugin:", error);
       this.settings = DEFAULT_SETTINGS;
     }
   }
 
   onunload() {
-    // CodeMirror extensions are automatically cleaned up by Obsidian
+    if (this.styleEl?.parentElement) {
+      this.styleEl.parentElement.removeChild(this.styleEl);
+    }
+    this.styleEl = null;
   }
 }
 
@@ -269,50 +347,77 @@ class TaskHiderSettingTab extends PluginSettingTab {
     const { containerEl } = this;
 
     containerEl.empty();
-
-    containerEl.createEl("h2", { text: "Completed Task Display Settings" });
+    containerEl.createEl("h2", { text: "Obsidian Checkers Hider Settings" });
 
     new Setting(containerEl)
-      .setName("Show status bar message")
-      .setDesc("Display 'Hiding/Showing Completed Tasks' in the status bar")
+      .setName("Show status bar toggle")
+      .setDesc("Display a clickable status bar control for hiding or showing matching tasks.")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.showStatusBar)
-          .onChange(async (value) => {
+          .onChange(async (value: boolean) => {
             this.plugin.settings.showStatusBar = value;
-            await this.plugin.saveSettings();
-
-            // Update status bar visibility
-            if (value && !this.plugin.statusBar) {
-              this.plugin.statusBar = this.plugin.addStatusBarItem();
-              this.plugin.statusBar.setText(
-                this.plugin.settings.hiddenState
-                  ? "Hiding Completed Tasks"
-                  : "Showing Completed Tasks",
-              );
-            } else if (!value && this.plugin.statusBar) {
-              this.plugin.statusBar.remove();
-              this.plugin.statusBar = null;
+            if (value) {
+              this.plugin.ensureStatusBar();
+            } else {
+              this.plugin.removeStatusBar();
             }
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Task marker mode")
+      .setDesc("Hide listed markers, or keep listed markers visible and hide other non-empty task statuses.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("hide-listed", "Hide listed markers")
+          .addOption("keep-listed", "Keep listed markers")
+          .setValue(this.plugin.settings.mode)
+          .onChange(async (value: TaskMarkerMode) => {
+            this.plugin.settings.mode = value;
+            this.plugin.applySettingsToWorkspace();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Task markers")
+      .setDesc("Comma- or space-separated checkbox markers. Defaults to x and X.")
+      .addText((text) =>
+        text
+          .setPlaceholder("x, X, -, /")
+          .setValue(this.plugin.settings.taskMarkers.join(", "))
+          .onChange(async (value: string) => {
+            this.plugin.settings.taskMarkers = normalizeTaskMarkers(parseListSetting(value));
+            this.plugin.applySettingsToWorkspace();
+            await this.plugin.saveSettings();
           }),
       );
 
     new Setting(containerEl)
       .setName("Hide sub-bullets")
-      .setDesc(
-        "In Edit/Live Preview mode: hide sub-bullets (indented items) beneath completed tasks. Note: In Reading view, sub-bullets are automatically hidden with their parent task.",
-      )
+      .setDesc("In Source and Live Preview, also hide indented lines beneath a hidden task until the next blank or same-level line.")
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.hideSubBullets).onChange(async (value) => {
+        toggle.setValue(this.plugin.settings.hideSubBullets).onChange(async (value: boolean) => {
           this.plugin.settings.hideSubBullets = value;
+          this.plugin.applySettingsToWorkspace();
           await this.plugin.saveSettings();
-
-          // Update body classes for CSS
-          this.plugin.updateBodyClasses();
-
-          // Update all editor extensions with new settings
-          this.plugin.updateEditorExtensions();
         }),
+      );
+
+    new Setting(containerEl)
+      .setName("Page override tags")
+      .setDesc("Comma- or space-separated tags that show matching tasks for a page. Tags can be inline or in frontmatter.")
+      .addText((text) =>
+        text
+          .setPlaceholder("checkers-show-completed, ctd-show-completed")
+          .setValue(this.plugin.settings.disableHidingTags.join(", "))
+          .onChange(async (value: string) => {
+            this.plugin.settings.disableHidingTags = parseListSetting(value).map((tag) => tag.replace(/^#/, ""));
+            this.plugin.applySettingsToWorkspace();
+            await this.plugin.saveSettings();
+          }),
       );
   }
 }

@@ -1,235 +1,156 @@
-# Completed Task Display
+# Obsidian Checkers Hider
 
-An [Obsidian](https://obsidian.md) plugin that allows you to toggle the visibility of completed tasks globally across your vault.
+Obsidian Checkers Hider is an Obsidian plugin for hiding completed or custom-status checklist items while keeping the note content intact.
+
+It started as a standalone continuation of the original Completed Task Display plugin, with support for custom checkbox markers, inverted matching, per-page overrides, and better Live Preview hiding through CodeMirror decorations.
 
 ## Features
 
-- **Toggle completed tasks** - Hide or show completed `[x]` tasks with a single click
-- **Ribbon button** - Quick access from the Obsidian ribbon
-- **Command palette** - Use `Toggle Completed Task View` command
-- **Status bar indicator** - Shows current state (Hiding/Showing Completed Tasks)
-- **Settings panel** - Configure status bar visibility and sub-bullet hiding
-- **Hide sub-bullets** - Optionally hide indented items beneath completed tasks (Edit/Live Preview mode only)
-- **Persistent state** - Remembers your preferences between sessions
-- **Custom task status support** - Only hides `[x]` and `[X]`, preserving custom statuses like `[?]`, `[!]`, `[/]`
-- **Cross-platform** - Works on desktop and mobile
-
-### Demo
-
-![](demo-assets/ribbon-button.gif)
+- Toggle matching checklist items from the ribbon, command palette, or clickable status bar.
+- Hide standard completed tasks like `[x]` and `[X]`.
+- Configure custom checkbox markers such as `[-]`, `[/]`, `[?]`, or `[!]`.
+- Choose whether the marker list means "hide these" or "keep these visible".
+- Optionally hide indented sub-bullets and nested tasks under a hidden parent task in Source and Live Preview.
+- Disable hiding for individual pages with inline or frontmatter tags.
+- Works in Reading view and Live Preview/Source mode.
 
 ## Installation
 
-### From Obsidian Community Plugins
+### Manual Install
 
-1. Open Obsidian Settings
-2. Go to `Community Plugins` and disable `Restricted mode`
-3. Click `Browse` and search for "Completed Task Display"
-4. Click `Install`, then `Enable`
+1. Download `main.js`, `manifest.json`, and `styles.css` from a release.
+2. Put the files in `<vault>/.obsidian/plugins/obsidian-checkers-hider/`.
+3. Reload Obsidian.
+4. Enable `Obsidian Checkers Hider` in Settings -> Community plugins.
 
-### Manual Installation
+### Development Install
 
-1. Download the [latest release](https://github.com/heliostatic/completed-task-display/releases/latest)
-2. Extract the files into `<vault>/.obsidian/plugins/completed-task-display/`
-3. Reload Obsidian
-4. Enable the plugin in Settings > Community Plugins
+```bash
+npm install
+npm run build
+```
+
+Then copy or symlink this repository into:
+
+```text
+<vault>/.obsidian/plugins/obsidian-checkers-hider/
+```
 
 ## Usage
 
-### Toggle Completed Tasks
+Use the ribbon icon, the `Toggle Checkers Hider` command, or the status bar control to switch hiding on and off globally.
 
-**Using the Ribbon:**
-- Click the tasks icon in the left ribbon
+The global toggle is saved between sessions.
 
-**Using Command Palette:**
-- Press `Ctrl/Cmd + P`
-- Search for "Toggle Completed Task View"
+## Settings
 
-**Status Bar:**
-- Check the status bar at the bottom to see current state
+### Task Marker Mode
 
-### Supported Task Formats
+`Hide listed markers` hides only tasks whose checkbox marker is listed in `Task markers`.
 
-The plugin only hides truly completed tasks:
-- `[x]` - Completed (hidden)
-- `[X]` - Completed (hidden)
+Default:
 
-All other task statuses remain visible:
-- `[ ]` - Uncompleted
-- `[?]` - Possible task
-- `[!]` - Urgent task
-- `[/]` - In-progress task
-- `[-]` - Cancelled task
-- Any other custom status
+```text
+x, X
+```
 
-### Settings
+This hides:
 
-Access settings via Settings → Community Plugins → Completed Task Display:
+```markdown
+- [x] done
+- [X] done
+```
 
-**Show status bar message**
-- Toggle the status bar indicator on/off
-- Shows "Hiding/Showing Completed Tasks" in the status bar
+`Keep listed markers` is the inverted behavior. It keeps `[ ]` and the listed custom markers visible, then hides other non-empty task statuses.
 
-**Hide sub-bullets** (Edit/Live Preview mode only)
-- When enabled, hides indented items (sub-bullets) beneath completed tasks
-- Only works in Edit and Live Preview modes
-- In Reading view, sub-bullets are automatically hidden with their parent task
-- Useful for cleaning up nested task lists while editing
+For example, with markers:
+
+```text
+?, /
+```
+
+These stay visible:
+
+```markdown
+- [ ] open
+- [?] question
+- [/] in progress
+```
+
+Other non-empty statuses, including `[x]`, are hidden.
+
+### Task Markers
+
+Enter markers separated by commas or spaces:
+
+```text
+x, X, -, /
+```
+
+Do not include the brackets. Use `/`, not `[/]`.
+
+### Hide Sub-Bullets
+
+When enabled, Source mode and Live Preview also hide indented lines below a hidden task until the next blank line or same-level line.
+
+Example:
+
+```markdown
+- [x] done
+  - nested bullet
+  - [ ] nested unchecked task
+- [ ] independent task
+```
+
+With `Hide sub-bullets` on, the first three lines are hidden. With it off, only the completed parent task is hidden.
+
+In Reading view, nested content is part of the rendered list item, so it follows the hidden parent task.
+
+### Page Override Tags
+
+Use `Page override tags` to show completed or matching tasks on specific pages even when global hiding is enabled.
+
+Defaults:
+
+```text
+checkers-show-completed, ctd-show-completed
+```
+
+Inline tag:
+
+```markdown
+#checkers-show-completed
+```
+
+Frontmatter:
+
+```yaml
+---
+tags:
+  - checkers-show-completed
+---
+```
+
+The override is evaluated per markdown view, so different tabs can show different behavior at the same time.
 
 ## Development
 
-### Prerequisites
-
-- Node.js 20.x or later
-- npm
-- An Obsidian vault for testing
-
-### Setup
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/heliostatic/completed-task-display.git
-   cd completed-task-display
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Build the plugin:**
-   ```bash
-   npm run build
-   ```
-
-### Development Workflow
-
-1. **Link to your test vault:**
-   ```bash
-   # Create a symlink to your vault's plugins folder
-   ln -s /path/to/completed-task-display /path/to/vault/.obsidian/plugins/completed-task-display
-   ```
-
-2. **Start development mode:**
-   ```bash
-   npm run dev
-   ```
-   This will watch for changes and rebuild automatically.
-
-3. **Reload the plugin in Obsidian:**
-   - Open Command Palette (`Ctrl/Cmd + P`)
-   - Run "Reload app without saving"
-   - Or manually disable and re-enable the plugin
-
-### Project Structure
-
-```
-completed-task-display/
-├── main.ts           # Main plugin code
-├── styles.css        # Plugin styles
-├── manifest.json     # Plugin manifest
-├── versions.json     # Version compatibility mapping
-├── package.json      # NPM dependencies
-├── tsconfig.json     # TypeScript configuration
-└── rollup.config.js  # Build configuration
+```bash
+npm install
+npm test
+npm run build
 ```
 
-### Building
+Release files are:
 
-- **Development build:** `npm run dev` (watches for changes)
-- **Production build:** `npm run build`
-
-### Testing
-
-1. Copy built files to a test vault:
-   ```bash
-   cp main.js manifest.json styles.css /path/to/vault/.obsidian/plugins/completed-task-display/
-   ```
-
-2. Reload Obsidian and test:
-   - Toggle completed tasks on/off
-   - Test with various task statuses
-   - Verify state persistence after restart
-
-## Technical Details
-
-### Compatibility
-
-- **Obsidian API**: v1.10.0
-- **Minimum Obsidian Version**: 0.10.0
-- **Node.js**: 20.x (for development)
-- **TypeScript**: 5.9.3
-
-### How It Works
-
-The plugin uses CSS classes to toggle visibility:
-1. Adds `hide-completed-tasks` class to document body when active
-2. CSS selectors target completed tasks in both Reading and Edit modes
-3. State is persisted using Obsidian's data storage API
-
-### Dependencies
-
-**Runtime:**
-- Obsidian API (provided by Obsidian)
-
-**Development:**
-- TypeScript 5.9.3
-- Rollup 4.52.5
-- Various Rollup plugins for bundling
-
-See `package.json` for complete dependency list.
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Reporting Issues
-
-- Check [existing issues](https://github.com/heliostatic/completed-task-display/issues) first
-- Use issue templates when available
-- Include Obsidian version and plugin version
-- Provide steps to reproduce bugs
-
-### Pull Requests
-
-- Fork the repository
-- Create a feature branch
-- Follow the existing code style
-- Test your changes thoroughly
-- Update documentation as needed
-- Submit a pull request with a clear description
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Changelog
-
-### v1.0.7 (2025-10-21)
-- 🐛 Fix: Only hide `[x]` and `[X]` tasks, not all custom statuses
-- Fixes support for Tasks plugin custom statuses
-- Resolves issues #3, #13, #19
-
-### v1.0.6 (2025-10-21)
-- 🐛 Fix: CSS syntax error
-- 🐛 Fix: Error handling for corrupted data
-- 🐛 Fix: Line number display in edit mode (#28)
-- 🔧 Update package.json metadata
-- 🚀 Modernize dependencies (TypeScript 5.9.3, Rollup 4.52.5)
-- 🚀 Modernize GitHub Actions workflow
-- 📄 Add MIT LICENSE file
-
-### v1.0.5
-- State persistence between sessions
-
-See [full changelog](https://github.com/heliostatic/completed-task-display/releases) for all versions.
+- `main.js`
+- `manifest.json`
+- `styles.css`
 
 ## Credits
 
-Created by [Ben Lee-Cohen](https://github.com/heliostatic)
+Based on [heliostatic/completed-task-display](https://github.com/heliostatic/completed-task-display) by Ben Lee-Cohen.
 
-## Support
+## License
 
-- [Report a bug](https://github.com/heliostatic/completed-task-display/issues/new)
-- [Request a feature](https://github.com/heliostatic/completed-task-display/issues/new)
-- [View documentation](https://github.com/heliostatic/completed-task-display)
+MIT License. See [LICENSE](LICENSE).
