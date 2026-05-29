@@ -2,17 +2,26 @@
 
 Hide completed and custom-status checklist items in Obsidian without changing your notes.
 
-Checkers Hider can hide regular completed tasks like `[x]`, custom checkbox markers like `[-]` or `[/]`, and matching tasks rendered by Reading view, Live Preview, Kanban, Canvas, Dataview task lists, and hover previews.
+Checkers Hider can hide regular completed tasks like `[x]` and custom checkbox markers like `[-]` or `[/]`.
 
 ## Features
 
 - Hide or show matching checklist items with a command, status bar icon, or optional ribbon button.
 - Hide completed tasks by default: `[x]` and `[X]`.
-- Configure custom task markers such as `-`, `/`, `?`, or `!`.
+- Configure custom task markers such as `-`, `/`, `?`, `!`, or any other single character.
 - Choose whether the marker list means "hide these markers" or "keep these markers visible".
 - Optionally hide nested bullets under a hidden task.
 - Optionally show all checkboxes while editing, while still hiding them in preview.
 - Disable hiding on specific pages with an inline or frontmatter tag.
+
+## Tested Views
+
+- Reading view.
+- Source mode and Live Preview.
+- Hover preview popovers.
+- Kanban boards.
+- Canvas cards.
+- Dataview task lists, including DataviewJS task lists in Canvas.
 
 ## Install
 
@@ -42,15 +51,15 @@ The status bar icon is dark green when hiding is enabled and gray when it is dis
 
 `Task markers`
 
-Markers are entered without brackets, separated by commas or spaces:
+Every character in this field is treated as a marker. Do not add separators unless you also want them to match.
 
 ```text
-x, X, -, /
+xX-/
 ```
 
 `Hide sub-bullets`
 
-Also hides indented bullets and nested tasks under a hidden task.
+In Source mode and Live Preview, also hides indented bullets and nested tasks under a hidden task. In rendered views, Obsidian usually renders nested content inside the parent task item, so it is hidden with the parent.
 
 `Show all checkboxes in edit mode`
 

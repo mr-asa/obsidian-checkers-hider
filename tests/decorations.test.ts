@@ -7,6 +7,7 @@ import {
   getTaskMarkerFromText,
   normalizeTaskMarkers,
   parseListSetting,
+  parseTaskMarkerSetting,
   shouldDisableHidingForMetadata,
   shouldHideTaskMarker,
 } from "../utils";
@@ -31,9 +32,14 @@ describe("task marker parsing", () => {
     expect(parseListSetting("x, X / -")).toEqual(["x", "X", "/", "-"]);
   });
 
+  it("parses each task marker setting character literally", () => {
+    expect(parseTaskMarkerSetting("x, X, -, /")).toEqual(["x", ",", " ", "X", ",", " ", "-", ",", " ", "/"]);
+    expect(normalizeTaskMarkers(parseTaskMarkerSetting("xxX-/"))).toEqual(["x", "X", "-", "/"]);
+  });
+
   it("normalizes empty marker lists to completed defaults", () => {
     expect(normalizeTaskMarkers([])).toEqual(["x", "X"]);
-    expect(normalizeTaskMarkers(["x", "x", " X "])).toEqual(["x", "X"]);
+    expect(normalizeTaskMarkers(["x", "x", "X"])).toEqual(["x", "X"]);
   });
 });
 

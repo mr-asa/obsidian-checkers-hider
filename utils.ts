@@ -48,15 +48,18 @@ export function parseListSetting(value: string): string[] {
     .filter(Boolean);
 }
 
+export function parseTaskMarkerSetting(value: string): string[] {
+  return Array.from(value);
+}
+
 export function normalizeTaskMarkers(markers: string[]): string[] {
   const result: string[] = [];
 
   for (const marker of markers) {
-    const trimmed = marker.trim();
-    if (trimmed === "" || result.includes(trimmed)) {
+    if (marker === "" || result.includes(marker)) {
       continue;
     }
-    result.push(trimmed);
+    result.push(marker);
   }
 
   return result.length > 0 ? result : DEFAULT_TASK_MARKERS;

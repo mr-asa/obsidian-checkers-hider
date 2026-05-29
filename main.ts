@@ -19,6 +19,7 @@ import {
   getHiddenLineNumbers,
   normalizeTaskMarkers,
   parseListSetting,
+  parseTaskMarkerSetting,
   shouldDisableHidingForMetadata,
 } from "./utils";
 
@@ -581,13 +582,13 @@ class TaskHiderSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Task markers")
-      .setDesc("Comma- or space-separated checkbox markers. Defaults to x and X.")
+      .setDesc("Every character in this field is treated as a checkbox marker. Defaults to xX.")
       .addText((text) =>
         text
-          .setPlaceholder("x, X, -, /")
-          .setValue(this.plugin.settings.taskMarkers.join(", "))
+          .setPlaceholder("xX-/")
+          .setValue(this.plugin.settings.taskMarkers.join(""))
           .onChange(async (value: string) => {
-            this.plugin.settings.taskMarkers = normalizeTaskMarkers(parseListSetting(value));
+            this.plugin.settings.taskMarkers = normalizeTaskMarkers(parseTaskMarkerSetting(value));
             this.plugin.applySettingsToWorkspace();
             await this.plugin.saveSettings();
           }),
